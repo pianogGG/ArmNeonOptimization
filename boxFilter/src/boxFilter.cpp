@@ -205,8 +205,8 @@ void BoxFilter::fastFilterV2NeonIntrinsics(float *input, int radius, int height,
     colSumPtr[indexW] = 0;
   } 
 
-  int n = width >> 2;
-  int re = width - (n << 2);
+  int n = width >> 2;//除以4就相当于一次load 4个
+  int re = width - (n << 2);////remain,如果不是4的倍数的话
   // sum vertical
   for (int h = 0; h < radius; ++h) {
     int shift = h * width;
