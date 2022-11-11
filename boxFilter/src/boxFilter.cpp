@@ -60,41 +60,57 @@ void BoxFilter::fastFilter(float *input, int radius, int height, int width, floa
       }
     }
   }
+  //这边你可以假设只求一个w上的点, w=0的情况。。。。。
+//     for (int h = 0; h < height; ++h) {
+//           int shift = h * width;
+//           int start_h = std::max(0, h - radius);
+//           int end_h = std::min(height - 1, h + radius);
+//           for (int sh = start_h; sh <= end_h; ++sh) {
+//                 int out_shift = sh * width;
+
+//                 output[shift + w] += cachePtr[out_shift + w];
+//           }
+//      }
+  
+  
+  
+  
 }
+
 //计算量：h*w: 空间换时间
 void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, float *output) {
-  float *cachePtr = &(cache[0]);
-  // sum horizonal
-  for (int h = 0; h < height; ++h) {
-    int shift = h * width;
-    //suppose :height=width=5, radius=1,so padding=1, kernel_size=2*radius + 1
-    float tmp = 0;
-    for (int w = 0; w < radius; ++w) {
-      tmp += input[shift + w];//tmp=input[h][0];
-    }
+    float *cachePtr = &(cache[0]);
+    // sum horizonal
+    for (int h = 0; h < height; ++h) {
+        int shift = h * width;
+        //suppose :height=width=5, radius=1,so padding=1, kernel_size=2*radius + 1
+        float tmp = 0;
+        for (int w = 0; w < radius; ++w) {
+        tmp += input[shift + w];//tmp=input[h][0];
+        }
 
-    for (int w = 0; w <= radius; ++w) {
-      tmp += input[shift + w + radius];//tmp+=input[h][1];tmp+=input[h][1]+input[h][2];
-      cachePtr[shift + w] = tmp;
-    }
-    //cachePtr[h][0]=input[h][0]+input[h][1];cachePtr[h][1]=input[h][0]+input[h][1]+input[h][2];
+        for (int w = 0; w <= radius; ++w) {
+        tmp += input[shift + w + radius];//tmp+=input[h][1];tmp+=input[h][1]+input[h][2];
+        cachePtr[shift + w] = tmp;
+        }
+        //cachePtr[h][0]=input[h][0]+input[h][1];cachePtr[h][1]=input[h][0]+input[h][1]+input[h][2];
 
-    int start = radius + 1;//2~3
-    int end = width - 1 - radius;
-    for (int w = start; w <= end; ++w) {
-      tmp += input[shift + w + radius];
-      tmp -= input[shift + w - radius - 1];
-      cachePtr[shift + w] = tmp;//cachePtr[h][2],cachePtr[h][3]
-    }
-    //w方向的最后一列
-    start = width - radius;//4
-    for (int w = start; w < width; ++w) {
-      tmp -= input[shift + w - radius - 1];//input[shift + w - radius - 1]：表示上一个kernel的第一个
-      cachePtr[shift + w] = tmp;//这边又特殊处理了最后一个4: cachePtr[h][4]
-    }
+        int start = radius + 1;//2~3
+        int end = width - 1 - radius;
+        for (int w = start; w <= end; ++w) {
+        tmp += input[shift + w + radius];
+        tmp -= input[shift + w - radius - 1];
+        cachePtr[shift + w] = tmp;//cachePtr[h][2],cachePtr[h][3]
+        }
+        //w方向的最后一列
+        start = width - radius;//4
+        for (int w = start; w < width; ++w) {
+        tmp -= input[shift + w - radius - 1];//input[shift + w - radius - 1]：表示上一个kernel的第一个
+        cachePtr[shift + w] = tmp;//这边又特殊处理了最后一个4: cachePtr[h][4]
+        }
   }
   //上述代码中定义了一个ColSum用于保存每行某个位置处在列方向上指定半径内各中间元素的累加值，对于第一行，做特殊处理，其他行的每个元素的处理方式和
-  float *colSumPtr = &(colSum[0]);
+  float *colSumPtr = &(colSum[0]);//大小是一个w的大小
   for (int indexW = 0; indexW < width; ++indexW) {
     colSumPtr[indexW] = 0;
   } 
@@ -108,6 +124,7 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
   //这边h仅有一个数字=0
   //colSumPtr[0] = cachePtr[0][0]
   //colSumPtr[1] = cachePtr[0][1]
+  //colSumPtr[2] = cachePtr[0][2]....colSumPtr[4]=cachePtr[0][4]
   //这边h=0或者1。。。。
   for (int h = 0; h <= radius; ++h) {
     float *addPtr = cachePtr + (h + radius) * width;//cachePtr[h+radius]
@@ -118,20 +135,22 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
       outPtr[w] = colSumPtr[w];
     }
   }
-  //当h=0的时候，output[h][w]=colSumPtr[w]；output[0][w]=colSumPtr[w]=cachePtr[1][w]+cachePtr[0][0]
-  //当h=1的时候，output[h][w]=colSumPtr[w]；output[1][w]=colSumPtr[w]=cachePtr[1][w]+cachePtr[0][0]+cachePtr[2][w]
+  //当h=0的时候，output[0][w]=colSumPtr[w]=colSumPtr[w] += cachePtr[h+radius][w];
+  //output[0][w]=colSumPtr[w]=cachePtr[0][0]+cachePtr[1][w]
+  //当h=1的时候，output[1][w]=colSumPtr[w];
+  //output[1][w]=colSumPtr[w]=cachePtr[0][0]+cachePtr[1][w]++cachePtr[2][w]
 
-  int start = radius + 1;
-  int end = height - 1 - radius;
+  int start = radius + 1;//2
+  int end = height - 1 - radius;//3
   for (int h = start; h <= end; ++h) {
-    float *addPtr = cachePtr + (h + radius) * width;
-    float *subPtr = cachePtr + (h - radius - 1) * width;
+    float *addPtr = cachePtr + (h + radius) * width;//cachePtr[h + radius]
+    float *subPtr = cachePtr + (h - radius - 1) * width;//cachePtr[h - radius - 1]
     int shift = h * width;
     float *outPtr = output + shift;
     for (int w = 0; w < width; ++w) {
       colSumPtr[w] += addPtr[w];
       colSumPtr[w] -= subPtr[w];
-      outPtr[w] = colSumPtr[w];
+      outPtr[w] = colSumPtr[w];//output[h][w]=colSumPtr[w]
     }
   }
   //这边是处理最后一行的逻辑
@@ -146,6 +165,8 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
     }
   }
 }
+
+
 
 void BoxFilter::fastFilterV2NeonIntrinsics(float *input, int radius, int height, int width, float *output) {
   float *cachePtr = &(cache[0]);
