@@ -6,7 +6,7 @@
 #if __ARM_NEON
 #include <arm_neon.h>
 #endif // __ARM_NEON
-
+//计算量：h*w*(2*radius+1)*(2*radius+1)
 void BoxFilter::filter(float *input, int radius, int height, int width, float *output) {
   for (int h = 0; h < height; ++h) {
     int height_sift = h * width;
@@ -27,7 +27,7 @@ void BoxFilter::filter(float *input, int radius, int height, int width, float *o
     }
   }
 }
-
+//计算量：h*w*(2*radius+1)*2: 空间换时间
 void BoxFilter::fastFilter(float *input, int radius, int height, int width, float *output) {
   float *cachePtr = &(cache[0]);
   // sum horizonal
@@ -54,13 +54,13 @@ void BoxFilter::fastFilter(float *input, int radius, int height, int width, floa
 
     for (int sh = start_h; sh <= end_h; ++sh) {
       int out_shift = sh * width;
-      for (int w = 0; w < width; ++w) {
+      for (int w = 0; w < width; ++w) {//注意这边w是0到width
         output[out_shift + w] += cachePtr[shift + w];
       }
     }
   }
 }
-
+//计算量：h*w: 空间换时间
 void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, float *output) {
   float *cachePtr = &(cache[0]);
   // sum horizonal
@@ -85,7 +85,7 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
       tmp -= input[shift + w - radius - 1];
       cachePtr[shift + w] = tmp;//cachePtr[h][2],cachePtr[h][3]
     }
-
+    //w方向的最后一列
     start = width - radius;//4
     for (int w = start; w < width; ++w) {
       tmp -= input[shift + w - radius - 1];//input[shift + w - radius - 1]：表示上一个kernel的第一个
@@ -133,7 +133,7 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
       outPtr[w] = colSumPtr[w];
     }
   }
-
+  //这边是处理最后一行的逻辑
   start = height - radius;
   for (int h = start; h < height; ++h) {
     float *subPtr = cachePtr + (h - radius - 1) * width;
