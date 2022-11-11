@@ -42,7 +42,7 @@ void BoxFilter::fastFilter(float *input, int radius, int height, int width, floa
         tmp += input[sift + sw];
       }
 
-      cachePtr[sift + w] = tmp;
+      cachePtr[sift + w] = tmp;//这个cacheptr的大小是原矩阵的大小的
     }
   }
 
@@ -55,7 +55,8 @@ void BoxFilter::fastFilter(float *input, int radius, int height, int width, floa
     for (int sh = start_h; sh <= end_h; ++sh) {
       int out_shift = sh * width;
       for (int w = 0; w < width; ++w) {//注意这边w是0到width
-        output[out_shift + w] += cachePtr[shift + w];
+        //output[out_shift + w] += cachePtr[shift + w];//output[sh][w]+=cachePtr[h][w];?????这边的结果好像是不对的
+        output[shift + w] += cachePtr[out_shift + w];
       }
     }
   }
