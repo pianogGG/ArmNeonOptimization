@@ -66,53 +66,59 @@ void BoxFilter::fastFilterV2(float *input, int radius, int height, int width, fl
   // sum horizonal
   for (int h = 0; h < height; ++h) {
     int shift = h * width;
-
+    //suppose :height=width=5, radius=1,so padding=1, kernel_size=2*radius + 1
     float tmp = 0;
     for (int w = 0; w < radius; ++w) {
-      tmp += input[shift + w];
+      tmp += input[shift + w];//tmp=input[h][0];
     }
 
     for (int w = 0; w <= radius; ++w) {
-      tmp += input[shift + w + radius];
+      tmp += input[shift + w + radius];//tmp+=input[h][1];tmp+=input[h][1]+input[h][2];
       cachePtr[shift + w] = tmp;
     }
+    //cachePtr[h][0]=input[h][0]+input[h][1];cachePtr[h][1]=input[h][0]+input[h][1]+input[h][2];
 
-    int start = radius + 1;
+    int start = radius + 1;//2~3
     int end = width - 1 - radius;
     for (int w = start; w <= end; ++w) {
       tmp += input[shift + w + radius];
       tmp -= input[shift + w - radius - 1];
-      cachePtr[shift + w] = tmp;
+      cachePtr[shift + w] = tmp;//cachePtr[h][2],cachePtr[h][3]
     }
 
-    start = width - radius;
+    start = width - radius;//4
     for (int w = start; w < width; ++w) {
-      tmp -= input[shift + w - radius - 1];
-      cachePtr[shift + w] = tmp;
+      tmp -= input[shift + w - radius - 1];//input[shift + w - radius - 1]：表示上一个kernel的第一个
+      cachePtr[shift + w] = tmp;//这边又特殊处理了最后一个4: cachePtr[h][4]
     }
   }
-
+  //上述代码中定义了一个ColSum用于保存每行某个位置处在列方向上指定半径内各中间元素的累加值，对于第一行，做特殊处理，其他行的每个元素的处理方式和
   float *colSumPtr = &(colSum[0]);
   for (int indexW = 0; indexW < width; ++indexW) {
     colSumPtr[indexW] = 0;
   } 
-  // sum vertical
+  // sum vertical,radius=1;
   for (int h = 0; h < radius; ++h) {
     int shift = h * width;
     for (int w = 0; w < width; ++w) {
-      colSumPtr[w] += cachePtr[shift + w];
+      colSumPtr[w] += cachePtr[shift + w];//cachePtr[h][w]
     }
   }
-
+  //这边h仅有一个数字=0
+  //colSumPtr[0] = cachePtr[0][0]
+  //colSumPtr[1] = cachePtr[0][1]
+  //这边h=0或者1。。。。
   for (int h = 0; h <= radius; ++h) {
-    float *addPtr = cachePtr + (h + radius) * width;
+    float *addPtr = cachePtr + (h + radius) * width;//cachePtr[h+radius]
     int shift = h * width;
-    float *outPtr = output + shift; 
+    float *outPtr = output + shift; //output[h]
     for (int w = 0; w < width; ++w) {
-      colSumPtr[w] += addPtr[w];
+      colSumPtr[w] += addPtr[w];//colSumPtr[w] += cachePtr[h+radius][w];  colSumPtr[w] += cachePtr[1][w]+cachePtr[2][w]
       outPtr[w] = colSumPtr[w];
     }
   }
+  //当h=0的时候，output[h][w]=colSumPtr[w]；output[0][w]=colSumPtr[w]=cachePtr[1][w]+cachePtr[0][0]
+  //当h=1的时候，output[h][w]=colSumPtr[w]；output[1][w]=colSumPtr[w]=cachePtr[1][w]+cachePtr[0][0]+cachePtr[2][w]
 
   int start = radius + 1;
   int end = height - 1 - radius;
